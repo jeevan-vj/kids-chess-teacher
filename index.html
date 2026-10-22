@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kids Chess Teacher ♟️</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Comic Sans MS', 'Chalkboard SE', 'Arial Rounded MT Bold', sans-serif;
+    background: linear-gradient(135deg, #87CEEB, #98FB98);
+    margin: 0;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  h1 { color: #2E8B57; margin: 10px 0; text-shadow: 1px 1px 2px white; font-size: 1.8em; }
+  .controls {
+    background: white;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 10px 0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+  }
+  select, button {
+    font-size: 1.1em;
+    padding: 8px 12px;
+    margin: 5px;
+    border-radius: 8px;
+    border: 2px solid #4CAF50;
+    background: #E8F5E9;
+  }
+  button { background: #4CAF50; color: white; cursor: pointer; font-weight: bold; }
+  button:hover { background: #45a049; }
+  #info {
+    background: #FFF8DC;
+    border: 3px solid #FFD700;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 10px 0;
+    min-height: 60px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+  }
+  .board-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .rank-labels, .file-labels {
+    display: flex;
+  }
+  .rank-labels { 
+    flex-direction: column; 
+    margin-right: 5px; 
+    justify-content: space-between;
+  }
+  .file-labels { 
+    margin-top: 5px; 
+    margin-left: 50px; /* offset for rank labels + margin */
+    justify-content: center;
+  }
+  .label {
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2em;
+    color: #2E8B57;
+    text-transform: uppercase;
+  }
+  .board-wrapper {
+    display: flex;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(8, 45px);
+    grid-template-rows: repeat(8, 45px);
+    border: 4px solid #8B4513;
+    border-radius: 5px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+  }
+  .square {
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .square.light { background: #F0D9B5; }
+  .square.dark { background: #B58863; }
+  .square.selected { outline: 4px solid #FF4500; z-index: 2; }
+  .square.move { background: #90EE90 !important; }
+  .square.capture { background: #FFB6C1 !important; }
+  .piece { pointer-events: none; }
+  .explanation {
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 15px;
+    max-width: 500px;
+    font-size: 0.95em;
+    line-height: 1.4;
+  }
+  @media (max-width: 500px) {
+    .board { grid-template-columns: repeat(8, 38px); grid-template-rows: repeat(8, 38px); }
+    .square { width: 38px; height: 38px; font-size: 1.7em; }
+    .label { width: 38px; height: 38px; font-size: 1em; }
+    .file-labels { margin-left: 43px; }
+  }
+</style>
+</head>
+<body>
+  <h1>♟️ Kids Chess Teacher</h1>
+  
+  <div class="controls">
+    <div>
+      <label>Piece: </label>
+      <select id="pieceSelect">
+        <option value="none">Just Learn Squares</option>
+        <option value="P">Pawn ♙</option>
+        <option value="N">Knight ♘</option>
+        <option value="B">Bishop ♗</option>
+        <option value="R">Rook ♖</option>
+        <option value="Q">Queen ♕</option>
+        <option value="K">King ♔</option>
+      </select>
+      <select id="colorSelect">
+        <option value="w">White</option>
+        <option value="b">Black</option>
+      </select>
+    </div>
+    <button onclick="clearHighlights()">Clear Highlights</button>
+    <button onclick="showHelp()">How to Use</button>
+    <button onclick="speakInstructions()">🔊 Hear Instructions</button>
+    <label style="display:block;margin-top:8px;">
+      <input type="checkbox" id="autoSpeak" checked> Speak automatically
+    </label>
+  </div>
+
+  <div id="info">Click any square to learn its name! Then choose a piece to see and hear how it moves. 🔊</div>
+
+  <div class="board-container">
+    <div class="board-wrapper">
+      <div class="rank-labels" id="rankLabels"></div>
+      <div class="board" id="board"></div>
+    </div>
+    <div class="file-labels" id="fileLabels"></div>
+  </div>
+
+  <div class="explanation" id="explanation">
+    <strong>Files</strong> are A to H (left to right). <strong>Ranks</strong> are 1 to 8 (bottom to top for White).<br>
+    Every square has a name like <em>E4</em> or <em>A1</em>.
+  </div>
+
+<script>
+const files = 'abcdefgh';
+const ranks = '87654321'; // top to bottom for rendering
+let selectedSquare = null;
+let currentPiece = null;
+let currentColor = 'w';
+
+const pieceSymbols = {
+  w: { P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔' },
+  b: { P: '♟', N: '♞', B: '♝', R: '♜', Q: '♛', K: '♚' }
+};
+
+const pieceNames = {
+  P: 'Pawn', N: 'Knight', B: 'Bishop', R: 'Rook', Q: 'Queen', K: 'King'
+};
+
+function createBoard() {
+  const board = document.getElementById('board');
+  const rankLabels = document.getElementById('rankLabels');
+  const fileLabels = document.getElementById('fileLabels');
+  board.innerHTML = '';
+  rankLabels.innerHTML = '';
+  fileLabels.innerHTML = '';
+
+  // Rank labels (8 to 1 top to bottom)
+  for (let r = 8; r >= 1; r--) {
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = r;
+    rankLabels.appendChild(label);
+  }
+
+  // File labels (a to h)
+  for (let f = 0; f < 8; f++) {
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = files[f].toUpperCase();
+    fileLabels.appendChild(label);
+  }
+
+  // Squares: rank 8 (index 0) at top to rank 1 (index 7) at bottom
+  for (let rankIdx = 0; rankIdx < 8; rankIdx++) {
+    const rank = 8 - rankIdx; // 8 to 1
+    for (let fileIdx = 0; fileIdx < 8; fileIdx++) {
+      const file = files[fileIdx];
+      const sq = document.createElement('div');
+      sq.className = 'square ' + ((fileIdx + rank) % 2 === 1 ? 'dark' : 'light');
+      sq.dataset.file = file;
+      sq.dataset.rank = rank;
+      sq.dataset.coord = file + rank;
+      sq.onclick = () => onSquareClick(sq);
+      board.appendChild(sq);
+    }
+  }
+}
+
+function speak(text) {
+  if (!document.getElementById('autoSpeak').checked && !window.forceSpeak) return;
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.9;
+  utter.pitch = 1.1;
+  utter.lang = 'en-US';
+  // Try to pick a female/kid-friendly voice if available
+  const voices = speechSynthesis.getVoices();
+  const preferred = voices.find(v => /female|woman|girl|samantha|karen|victoria|moira|luna|iris/i.test(v.name)) || voices[0];
+  if (preferred) utter.voice = preferred;
+  window.speechSynthesis.speak(utter);
+}
+
+function speakInstructions() {
+  window.forceSpeak = true;
+  speak("Welcome to Kids Chess Teacher! Click any square to hear its name. Choose a piece and a color, then click a square to see and hear how it moves. Files are a to h left to right. Ranks are 1 to 8 bottom to top for white. Have fun learning chess!");
+  setTimeout(() => { window.forceSpeak = false; }, 100);
+}
+
+function onSquareClick(sq) {
+  clearHighlights();
+  const coord = sq.dataset.coord;
+  selectedSquare = coord;
+  sq.classList.add('selected');
+
+  const pieceType = document.getElementById('pieceSelect').value;
+  const color = document.getElementById('colorSelect').value;
+
+  if (pieceType === 'none') {
+    const msg = `Square ${coord}. File ${coord[0]}, Rank ${coord[1]}.`;
+    document.getElementById('info').textContent = `Square: ${coord.toUpperCase()}  •  File ${coord[0].toUpperCase()}, Rank ${coord[1]}`;
+    speak(msg);
+    return;
+  }
+
+  // Place piece and show moves
+  sq.innerHTML = `<span class="piece">${pieceSymbols[color][pieceType]}</span>`;
+  const pieceName = pieceNames[pieceType];
+  const colorName = color === 'w' ? 'White' : 'Black';
+  document.getElementById('info').textContent = `${pieceName} on ${coord.toUpperCase()}`;
+
+  const moves = getPossibleMoves(pieceType, color, coord);
+  moves.forEach(m => {
+    const target = document.querySelector(`[data-coord="${m}"]`);
+    if (target) target.classList.add('move');
+  });
+
+  updateExplanation(pieceType, color);
+  const spoken = `${colorName} ${pieceName} on ${coord}. ${getSpokenExplanation(pieceType, color)}`;
+  speak(spoken);
+}
+
+function getPossibleMoves(piece, color, coord) {
+  const file = coord[0];
+  const rank = parseInt(coord[1]);
+  const fileIdx = files.indexOf(file);
+  const moves = [];
+
+  const isWhite = color === 'w';
+  const dir = isWhite ? 1 : -1;
+  const startRank = isWhite ? 2 : 7;
+
+  function add(f, r) {
+    if (f >= 0 && f < 8 && r >= 1 && r <= 8) {
+      moves.push(files[f] + r);
+    }
+  }
+
+  switch (piece) {
+    case 'P': // Pawn
+      // Forward 1
+      add(fileIdx, rank + dir);
+      // Forward 2 from start
+      if (rank === startRank) add(fileIdx, rank + 2 * dir);
+      // Captures
+      add(fileIdx - 1, rank + dir);
+      add(fileIdx + 1, rank + dir);
+      break;
+
+    case 'N': // Knight
+      const knightDeltas = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+      knightDeltas.forEach(([df, dr]) => add(fileIdx + df, rank + dr));
+      break;
+
+    case 'B': // Bishop
+      for (let d = 1; d < 8; d++) {
+        add(fileIdx + d, rank + d);
+        add(fileIdx + d, rank - d);
+        add(fileIdx - d, rank + d);
+        add(fileIdx - d, rank - d);
+      }
+      break;
+
+    case 'R': // Rook
+      for (let d = 1; d < 8; d++) {
+        add(fileIdx + d, rank);
+        add(fileIdx - d, rank);
+        add(fileIdx, rank + d);
+        add(fileIdx, rank - d);
+      }
+      break;
+
+    case 'Q': // Queen
+      // Bishop + Rook
+      for (let d = 1; d < 8; d++) {
+        add(fileIdx + d, rank + d);
+        add(fileIdx + d, rank - d);
+        add(fileIdx - d, rank + d);
+        add(fileIdx - d, rank - d);
+        add(fileIdx + d, rank);
+        add(fileIdx - d, rank);
+        add(fileIdx, rank + d);
+        add(fileIdx, rank - d);
+      }
+      break;
+
+    case 'K': // King
+      for (let df = -1; df <= 1; df++) {
+        for (let dr = -1; dr <= 1; dr++) {
+          if (df || dr) add(fileIdx + df, rank + dr);
+        }
+      }
+      break;
+  }
+  return moves;
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.square').forEach(sq => {
+    sq.classList.remove('selected', 'move', 'capture');
+    sq.innerHTML = '';
+  });
+  selectedSquare = null;
+  document.getElementById('info').textContent = 'Click a square to see its name, or choose a piece first!';
+}
+
+function updateExplanation(piece, color) {
+  const name = pieceNames[piece];
+  const colorName = color === 'w' ? 'White' : 'Black';
+  let text = `<strong>${colorName} ${name}:</strong> `;
+  switch (piece) {
+    case 'P': text += 'Moves 1 square forward (2 from starting rank). Captures diagonally forward.'; break;
+    case 'N': text += 'Jumps in an L-shape: 2 squares one way and 1 the other. Can jump over pieces!'; break;
+    case 'B': text += 'Moves any number of squares diagonally. Stays on the same color squares.'; break;
+    case 'R': text += 'Moves any number of squares horizontally or vertically (like a straight line).'; break;
+    case 'Q': text += 'The most powerful! Moves any number of squares in any direction (rook + bishop).'; break;
+    case 'K': text += 'Moves 1 square in any direction. The most important piece — protect it!'; break;
+  }
+  document.getElementById('explanation').innerHTML = text;
+}
+
+function getSpokenExplanation(piece, color) {
+  const colorName = color === 'w' ? 'White' : 'Black';
+  switch (piece) {
+    case 'P': return 'It moves one square forward, or two squares from its starting rank. It captures diagonally forward.';
+    case 'N': return 'The knight jumps in an L shape: two squares one way and one the other. It can jump over pieces!';
+    case 'B': return 'The bishop moves any number of squares diagonally and stays on the same color.';
+    case 'R': return 'The rook moves any number of squares straight, horizontally or vertically.';
+    case 'Q': return 'The queen is the most powerful. She moves any number of squares in any direction.';
+    case 'K': return 'The king moves one square in any direction. Protect the king!';
+    default: return '';
+  }
+}
+
+function showHelp() {
+  document.getElementById('info').textContent = '1. Click squares to learn names (a1, e4, etc.). 2. Choose a piece + color. 3. Click a square to place it and see green highlights for possible moves!';
+  document.getElementById('explanation').innerHTML = '<strong>Tips:</strong> White pieces start at the bottom (ranks 1-2). Black at the top (ranks 7-8). Files are a-h left to right. Have fun exploring!';
+  speakInstructions();
+}
+
+// Init
+createBoard();
+document.getElementById('pieceSelect').addEventListener('change', () => {
+  if (selectedSquare) {
+    const sq = document.querySelector(`[data-coord="${selectedSquare}"]`);
+    if (sq) onSquareClick(sq);
+  }
+});
+document.getElementById('colorSelect').addEventListener('change', () => {
+  if (selectedSquare) {
+    const sq = document.querySelector(`[data-coord="${selectedSquare}"]`);
+    if (sq) onSquareClick(sq);
+  }
+});
+</script>
+</body>
+</html>
